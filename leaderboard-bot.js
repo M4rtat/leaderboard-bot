@@ -325,7 +325,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // !leaderboard - создать основное сообщение с кнопкой
-  if (message.content === '!leaderboard') {
+  if (message.content === '!leader-board') {
     const embed = new EmbedBuilder()
       .setTitle('⚡ VORTEX LEADERBOARD ⚡')
       .setColor(0x87A9EC)
