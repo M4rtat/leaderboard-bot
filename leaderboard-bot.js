@@ -334,7 +334,7 @@ client.on('messageCreate', async (message) => {
   }
 
   // !leaderboard - создать основное сообщение с кнопкой
-  if (message.content === '!leaderboard') {
+  if (message.content === '!leader-board') {
     const lbText = formatLeaderboard(1, 30);
     
     const embed = new EmbedBuilder()
