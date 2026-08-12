@@ -418,7 +418,8 @@ client.on('interactionCreate', async (interaction) => {
     });
   } catch {}
 }
-     
+}
+});     
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
