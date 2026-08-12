@@ -418,10 +418,7 @@ client.on('interactionCreate', async (interaction) => {
     });
   } catch {}
 }
-      await interaction.message.edit({ components: [] });
-    }
-  }
-});
+     
 
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
