@@ -112,6 +112,60 @@ function getPlayerPlace(userId) {
   }
   return null;
 }
+async function announceDuel(
+  channel,
+  attackerUser,
+  place,
+  discord,
+  roblox,
+  link
+) {
+  const defenderData = leaderboard[place];
+
+  const embed = new EmbedBuilder()
+    .setTitle('⚔️ ДУЭЛЬ ⚔️')
+    .setColor(0xff0000)
+    .setDescription(
+      `**${attackerUser.username}** атакует место **${place}**!\n\n**${defenderData.discord}** защищается.`
+    );
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`duel_win_${attackerUser.id}`)
+      .setLabel('Атакующий выиграл')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  const duelMessage = await channel.send({
+    embeds: [embed],
+    components: [row],
+  });
+
+  const duelId = `${place}_${Date.now()}`;
+
+  duels[duelId] = {
+    duelId,
+    messageId: duelMessage.id,
+
+    targetPlace: place,
+
+    attackerId: attackerUser.id,
+
+    attackerDiscord: discord,
+    attackerRoblox: roblox,
+    attackerLink: link,
+
+    defenderId: defenderData.userId,
+
+    expiresAt:
+      Date.now() +
+      3 * 24 * 60 * 60 * 1000,
+  };
+
+  saveDuels(duels);
+
+  return true;
+}
 client.on('interactionCreate', async (interaction) => {
   // Modal submission (форма от /claim)
   if (interaction.isModalSubmit()) {
