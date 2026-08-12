@@ -104,6 +104,14 @@ client.once('ready', () => {
   console.log(`Бот запущен как ${client.user.tag}`);
 });
 
+function getPlayerPlace(userId) {
+  for (const [place, data] of Object.entries(leaderboard)) {
+    if (data.userId === userId) {
+      return parseInt(place);
+    }
+  }
+  return null;
+}
 client.on('interactionCreate', async (interaction) => {
   // Modal submission (форма от /claim)
   if (interaction.isModalSubmit()) {
