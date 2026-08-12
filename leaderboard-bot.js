@@ -68,17 +68,32 @@ function formatLeaderboard(start, end) {
   return text || 'Ошибка загрузки лидерборда';
 }
 
-async function updateLeaderboardMessage(channel) {
+async function updateLeaderboardMessage() {
   if (!leaderboardMessageId || !leaderboardChannelId) return;
 
   try {
+    const channel = client.channels.cache.get(leaderboardChannelId) || 
+                    await client.channels.fetch(leaderboardChannelId);
+    
+    if (!channel) return;
+    
     const msg = await channel.messages.fetch(leaderboardMessageId);
+    const lbText = formatLeaderboard(1, 30);
+    
     const embed = new EmbedBuilder()
       .setTitle('⚡ VORTEX LEADERBOARD ⚡')
       .setColor(0x87A9EC)
-      .setDescription('Нажми на кнопку ниже, чтобы атаковать место в лидерборде');
+      .setDescription(lbText)
+      .setFooter({ text: 'Нажми на кнопку ниже, чтобы атаковать место в лидерборде' });
 
-    await msg.edit({ embeds: [embed] });
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('attack_place')
+        .setLabel('Атаковать место')
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    await msg.edit({ embeds: [embed], components: [row] });
   } catch (err) {
     console.error('Ошибка обновления сообщения:', err);
   }
@@ -161,10 +176,7 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       // Обновляем лидерборд в основном сообщении
-      const channel = client.channels.cache.get(leaderboardChannelId);
-      if (channel) {
-        await updateLeaderboardMessage(channel);
-      }
+      await updateLeaderboardMessage();
     } else {
       // Занято — объявляем дуэль
       const channel = client.channels.cache.get(process.env.DUELS_CHANNEL_ID);
@@ -283,10 +295,7 @@ client.on('interactionCreate', async (interaction) => {
       });
 
       // Обновить основной лидерборд
-      const mainChannel = client.channels.cache.get(leaderboardChannelId);
-      if (mainChannel) {
-        await updateLeaderboardMessage(mainChannel);
-      }
+      await updateLeaderboardMessage();
 
       // Удалить кнопку с сообщения дуэли
       await interaction.message.edit({ components: [] });
@@ -325,11 +334,14 @@ client.on('messageCreate', async (message) => {
   }
 
   // !leaderboard - создать основное сообщение с кнопкой
-  if (message.content === '!leader-board') {
+  if (message.content === '!leaderboard') {
+    const lbText = formatLeaderboard(1, 30);
+    
     const embed = new EmbedBuilder()
       .setTitle('⚡ VORTEX LEADERBOARD ⚡')
       .setColor(0x87A9EC)
-      .setDescription('Нажми на кнопку ниже, чтобы атаковать место в лидерборде');
+      .setDescription(lbText)
+      .setFooter({ text: 'Нажми на кнопку ниже, чтобы атаковать место в лидерборде' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
