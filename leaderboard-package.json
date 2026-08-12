@@ -1,0 +1,15 @@
+{
+  "name": "vortex-leaderboard-bot",
+  "version": "1.0.0",
+  "description": "Discord leaderboard bot with battle duel system",
+  "main": "leaderboard-bot.js",
+  "scripts": {
+    "start": "node leaderboard-bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
