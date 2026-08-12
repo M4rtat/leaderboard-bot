@@ -99,47 +99,6 @@ async function updateLeaderboardMessage() {
   }
 }
 
-async function announceDuel(channel, attacker, attackerTag, defender, place) {
-  const embed = new EmbedBuilder()
-    .setTitle('⚔️ ДУЭЛЬ ⚔️')
-    .setColor(0xff0000)
-    .setDescription(
-      `**${attacker}** атакует место **${place}**!\n\n**${defender}** защищается.`
-    )
-    .setFooter({ text: 'Таймер: 3 дня. После времени место не изменится, если защитник не проиграет.' });
-
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`duel_win_${attackerTag}`)
-      .setLabel('Атакующий выиграл')
-      .setStyle(ButtonStyle.Danger)
-  );
-
-  const msg = await channel.send({ embeds: [embed], components: [row] });
-
-  // Сохраняем дуэль в памяти
-  const duelId = `${place}_${Date.now()}`;
-  duels[duelId] = {
-    messageId: msg.id,
-    place,
-    attacker,
-    attackerTag,
-    defender,
-    defenderTag: leaderboard[place].userId,
-    expiresAt: Date.now() + 3 * 24 * 60 * 60 * 1000, // 3 дня
-  };
-  saveDuels(duels);
-
-  // Таймер на 3 дня
-  setTimeout(() => {
-    if (duels[duelId]) {
-      delete duels[duelId];
-      saveDuels(duels);
-      msg.edit({ components: [] }).catch(() => {});
-    }
-  }, 3 * 24 * 60 * 60 * 1000);
-}
-
 // ============= Bot Events =============
 client.once('ready', () => {
   console.log(`Бот запущен как ${client.user.tag}`);
@@ -148,49 +107,158 @@ client.once('ready', () => {
 client.on('interactionCreate', async (interaction) => {
   // Modal submission (форма от /claim)
   if (interaction.isModalSubmit()) {
-    const place = parseInt(interaction.fields.getTextInputValue('place_input'));
-    const discord = interaction.fields.getTextInputValue('discord_input') || '[VACANT]';
-    const roblox = interaction.fields.getTextInputValue('roblox_input') || '[VACANT]';
-    const link = interaction.fields.getTextInputValue('link_input') || '[VACANT]';
 
-    if (!place || place < 1 || place > 30) {
-      return interaction.reply({ content: '❌ Место должно быть от 1 до 30', ephemeral: true });
-    }
+  const place = parseInt(
+    interaction.fields.getTextInputValue(
+      "place_input"
+    )
+  );
 
-    const currentEntry = leaderboard[place];
+  const discord =
+    interaction.fields.getTextInputValue(
+      "discord_input"
+    );
 
-    // Проверка: занято ли место?
-    if (currentEntry.discord === '[VACANT]') {
-      // Свободно — занимаем
-      leaderboard[place] = {
-        discord,
-        roblox,
-        link,
-        userId: interaction.user.id,
-      };
-      saveLeaderboard(leaderboard);
+  const roblox =
+    interaction.fields.getTextInputValue(
+      "roblox_input"
+    );
 
-      await interaction.reply({
-        content: `✅ Вы заняли место **${place}**!\n${discord} | ${roblox} | ${link}`,
-        ephemeral: true,
-      });
+  const link =
+    interaction.fields.getTextInputValue(
+      "link_input"
+    );
 
-      // Обновляем лидерборд в основном сообщении
-      await updateLeaderboardMessage();
-    } else {
-      // Занято — объявляем дуэль
-      const channel = client.channels.cache.get(process.env.DUELS_CHANNEL_ID);
-      if (channel) {
-        const defender = currentEntry.discord;
-        await announceDuel(channel, interaction.user.username, interaction.user.id, defender, place);
-      }
-
-      await interaction.reply({
-        content: `⚔️ Место **${place}** занято! Объявлена дуэль с **${currentEntry.discord}**`,
-        ephemeral: true,
-      });
-    }
+  if (
+    !place ||
+    place < 1 ||
+    place > 30
+  ) {
+    return interaction.reply({
+      content:
+        "❌ Место должно быть от 1 до 30",
+      ephemeral: true,
+    });
   }
+
+  const currentPlace =
+    getPlayerPlace(
+      interaction.user.id
+    );
+
+  // нельзя атаковать себя
+
+  if (
+    currentPlace &&
+    currentPlace === place
+  ) {
+    return interaction.reply({
+      content:
+        "❌ Нельзя атаковать своё место.",
+      ephemeral: true,
+    });
+  }
+
+  // нельзя атаковать вниз
+
+  if (
+    currentPlace &&
+    place > currentPlace
+  ) {
+    return interaction.reply({
+      content:
+        `❌ Нельзя атаковать места ниже ${currentPlace}.`,
+      ephemeral: true,
+    });
+  }
+
+  const target =
+    leaderboard[place];
+
+  // место свободно
+
+  if (
+    target.discord ===
+    "[VACANT]"
+  ) {
+
+    // игрок уже был в лб
+
+    if (currentPlace) {
+
+      leaderboard[
+        currentPlace
+      ] = {
+        discord: "[VACANT]",
+        roblox: "[VACANT]",
+        link: "[VACANT]",
+        userId: null,
+      };
+    }
+
+    leaderboard[place] = {
+      discord,
+      roblox,
+      link,
+      userId:
+        interaction.user.id,
+    };
+
+    saveLeaderboard(
+      leaderboard
+    );
+
+    await updateLeaderboardMessage();
+
+    return interaction.reply({
+      content:
+        `✅ Вы заняли место ${place}`,
+      ephemeral: true,
+    });
+  }
+
+  // место занято
+
+  if (
+    target.userId ===
+    interaction.user.id
+  ) {
+    return interaction.reply({
+      content:
+        "❌ Нельзя атаковать самого себя.",
+      ephemeral: true,
+    });
+  }
+
+  const duelChannel =
+    client.channels.cache.get(
+      process.env
+        .DUELS_CHANNEL_ID
+    );
+
+  if (!duelChannel) {
+    return interaction.reply({
+      content:
+        "❌ Канал дуэлей не найден.",
+      ephemeral: true,
+    });
+  }
+
+  await announceDuel(
+    duelChannel,
+    interaction.user,
+    place,
+    discord,
+    roblox,
+    link
+  );
+
+  return interaction.reply({
+    content:
+      `⚔️ Дуэль за место ${place} создана.`,
+    ephemeral: true,
+  });
+}
 
   // Button click: "Атаковать место"
   if (interaction.isButton()) {
@@ -234,70 +302,122 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // Обработка "Атакующий выиграл"
-    if (interaction.customId.startsWith('duel_win_')) {
-      const attackerTag = interaction.customId.replace('duel_win_', '');
+    if (
+  interaction.customId.startsWith(
+    "duel_win_"
+  )
+) {
 
-      // Найти дуэль
-      let duelId = null;
-      let duelData = null;
+  const attackerId =
+    interaction.customId.replace(
+      "duel_win_",
+      ""
+    );
 
-      for (const [id, duel] of Object.entries(duels)) {
-        if (duel.attackerTag === attackerTag && duel.messageId === interaction.message.id) {
-          duelId = id;
-          duelData = duel;
-          break;
-        }
-      }
+  let duelId = null;
+  let duelData = null;
 
-      if (!duelData) {
-        return interaction.reply({ content: '❌ Дуэль не найдена', ephemeral: true });
-      }
+  for (const [id, duel] of Object.entries(duels)) {
 
-      const place = duelData.place;
-      const attackerData = leaderboard[duelData.attackerTag];
-      const defenderPlace = Object.entries(leaderboard).find(
-        ([_, entry]) => entry.userId === duelData.defenderTag
-      )?.[0];
+    if (
+      duel.messageId ===
+        interaction.message.id &&
+      duel.attackerId ===
+        attackerId
+    ) {
+      duelId = id;
+      duelData = duel;
+      break;
+    }
+  }
 
-      // Своп
-      leaderboard[place] = {
-        discord: duelData.attacker,
-        roblox: attackerData?.roblox || '[VACANT]',
-        link: attackerData?.link || '[VACANT]',
-        userId: duelData.attackerTag,
-      };
+  if (!duelData) {
+    return interaction.reply({
+      content:
+        "❌ Дуэль не найдена.",
+      ephemeral: true,
+    });
+  }
 
-      if (defenderPlace) {
-        // Защитник был в лидерборде — переместить на его старое место
-        leaderboard[defenderPlace] = {
-          discord: duelData.defender,
-          roblox: duelData.defender, // Используем имя как плейсхолдер
-          link: '[VACANT]',
-          userId: duelData.defenderTag,
-        };
-      } else {
-        // Защитник НЕ был в лидерборде — удалить его место
-        leaderboard[place] = {
-          discord: duelData.attacker,
-          roblox: attackerData?.roblox || '[VACANT]',
-          link: attackerData?.link || '[VACANT]',
-          userId: duelData.attackerTag,
-        };
-      }
+  const targetPlace =
+    duelData.targetPlace;
 
-      saveLeaderboard(leaderboard);
-      delete duels[duelId];
-      saveDuels(duels);
+  const attackerOldPlace =
+    getPlayerPlace(
+      duelData.attackerId
+    );
 
-      await interaction.reply({
-        content: `✅ **${duelData.attacker}** выиграл дуэль!\n🏆 Новое место: **${place}**`,
-        ephemeral: true,
-      });
+  const defenderData = {
+    ...leaderboard[targetPlace]
+  };
 
-      // Обновить основной лидерборд
-      await updateLeaderboardMessage();
+  // ==================================
+  // АТАКУЮЩИЙ УЖЕ БЫЛ В ЛБ
+  // ==================================
 
-      // Удалить кнопку с сообщения дуэли
+  if (
+    attackerOldPlace &&
+    attackerOldPlace !==
+      targetPlace
+  ) {
+
+    const attackerData = {
+      ...leaderboard[
+        attackerOldPlace
+      ]
+    };
+
+    leaderboard[targetPlace] =
+      attackerData;
+
+    leaderboard[
+      attackerOldPlace
+    ] = defenderData;
+  }
+
+  // ==================================
+  // АТАКУЮЩЕГО НЕ БЫЛО В ЛБ
+  // ==================================
+
+  else {
+
+    leaderboard[targetPlace] = {
+      discord:
+        duelData.attackerDiscord,
+
+      roblox:
+        duelData.attackerRoblox,
+
+      link:
+        duelData.attackerLink,
+
+      userId:
+        duelData.attackerId,
+    };
+  }
+
+  saveLeaderboard(
+    leaderboard
+  );
+
+  delete duels[duelId];
+
+  saveDuels(duels);
+
+  await updateLeaderboardMessage();
+
+  await interaction.reply({
+    content:
+      `🏆 Победа!\nМесто ${targetPlace} теперь принадлежит ${duelData.attackerDiscord}`,
+    ephemeral: true,
+  });
+
+  try {
+    await interaction.message.edit({
+      components: [],
+    });
+  } catch {}
+}
       await interaction.message.edit({ components: [] });
     }
   }
